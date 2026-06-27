@@ -1,0 +1,1 @@
+<div class="max-w-7xl mx-auto px-4 py-20 text-center text-slate-500">Projects — coming in M2</div>

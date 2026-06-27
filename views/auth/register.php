@@ -1,0 +1,1 @@
+<h2 class="text-xl font-bold text-slate-900 mb-6 text-center">Create Account</h2><p class="text-center text-slate-500 text-sm">Registration form coming in M3.</p><div class="mt-4 text-center"><a href="/login" class="text-sm text-blue-600 hover:underline">Already have an account? Log in</a></div>

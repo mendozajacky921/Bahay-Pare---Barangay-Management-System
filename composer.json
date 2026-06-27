@@ -1,0 +1,25 @@
+{
+    "name": "barangay/management-system",
+    "description": "Barangay Management System",
+    "type": "project",
+    "require": {
+        "php": ">=8.2",
+        "vlucas/phpdotenv": "^5.6",
+        "guzzlehttp/guzzle": "^7.8",
+        "dompdf/dompdf": "^2.0",
+        "phpmailer/phpmailer": "^6.9",
+        "ramsey/uuid": "^4.7"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/",
+            "Core\\": "core/",
+            "Services\\": "services/",
+            "Controllers\\": "controllers/",
+            "Middleware\\": "middleware/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

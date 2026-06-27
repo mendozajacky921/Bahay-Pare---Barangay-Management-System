@@ -1,0 +1,1 @@
+<h2 class="text-xl font-bold text-slate-900 mb-6 text-center">Log In</h2><p class="text-center text-slate-500 text-sm">Login form coming in M3.</p><div class="mt-4 text-center"><a href="/register" class="text-sm text-blue-600 hover:underline">Register instead</a></div>

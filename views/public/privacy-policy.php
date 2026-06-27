@@ -1,0 +1,1 @@
+<div class="max-w-3xl mx-auto px-4 py-16"><h1 class="text-3xl font-bold text-slate-900 mb-6">Privacy Policy</h1><p class="text-slate-600">Full privacy policy coming in M3.</p></div>

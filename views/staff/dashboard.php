@@ -1,0 +1,1 @@
+<div class="max-w-4xl mx-auto"><div class="bg-white border border-slate-200 rounded-2xl p-8 text-center"><div class="text-5xl mb-4">⚙️</div><h2 class="text-xl font-bold text-slate-900 mb-2">Staff Dashboard</h2><p class="text-slate-500">Staff features are being built milestone by milestone.</p></div></div>
