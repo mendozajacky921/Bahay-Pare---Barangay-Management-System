@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Services;
 
 use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
+// HIGH-01 / LOW-02: Removed unused 'use PHPMailer\PHPMailer\SMTP' import
 use PHPMailer\PHPMailer\Exception as MailException;
 
 class EmailService
@@ -18,7 +18,9 @@ class EmailService
         $mail->SMTPAuth   = true;
         $mail->Username   = MAIL_USERNAME;
         $mail->Password   = MAIL_PASSWORD;
-        $mail->SMTPSecure = MAIL_ENCRYPTION === 'tls' ? PHPMailer::ENCRYPTION_STARTTLS : PHPMailer::ENCRYPTION_SMTPS;
+        $mail->SMTPSecure = MAIL_ENCRYPTION === 'tls'
+            ? PHPMailer::ENCRYPTION_STARTTLS
+            : PHPMailer::ENCRYPTION_SMTPS;
         $mail->Port       = MAIL_PORT;
         $mail->CharSet    = 'UTF-8';
         $mail->setFrom(MAIL_FROM_ADDRESS, MAIL_FROM_NAME);
@@ -51,11 +53,18 @@ class EmailService
 
     // ── Email Templates ───────────────────────────────────
 
+    /**
+     * HIGH-01 fix: the original body used the literal string '{barangayName}'
+     * as a placeholder inside a double-quoted string — it was never interpolated
+     * because PHP does not expand {key} as a variable unless it's {$var}.
+     * Fixed by referencing the BARANGAY_NAME constant directly.
+     */
     public function sendWelcome(string $email, string $name): bool
     {
-        $subject = 'Welcome to ' . BARANGAY_NAME . ' — Verify Your Email';
+        $barangayName = BARANGAY_NAME;
+        $subject = "Welcome to {$barangayName} — Verify Your Email";
         $html    = $this->template('Welcome', $name, "
-            <p>Thank you for registering with the {barangayName} Management System.</p>
+            <p>Thank you for registering with the <strong>{$barangayName}</strong> Management System.</p>
             <p>Please verify your email address by clicking the link sent to your inbox from our system.</p>
             <p>Once verified, our staff will review your registration. You will receive another email once your account is approved.</p>
         ");
@@ -64,10 +73,11 @@ class EmailService
 
     public function sendRequestReceived(string $email, string $name, string $requestType, string $trackingId): bool
     {
-        $subject = 'Request Received — ' . $this->formatRequestType($requestType);
-        $html    = $this->template('Request Received', $name, "
-            <p>We have received your request for a <strong>{$this->formatRequestType($requestType)}</strong>.</p>
-            <p><strong>Tracking ID:</strong> {$trackingId}</p>
+        $typeLabel = $this->formatRequestType($requestType);
+        $subject   = "Request Received — {$typeLabel}";
+        $html      = $this->template('Request Received', $name, "
+            <p>We have received your request for a <strong>{$typeLabel}</strong>.</p>
+            <p><strong>Tracking ID:</strong> " . htmlspecialchars($trackingId, ENT_QUOTES, 'UTF-8') . "</p>
             <p>You can track the status of your request by logging in to your account.</p>
             <p>Processing time depends on staff availability. You will be notified of any status changes via email.</p>
         ");
@@ -81,6 +91,7 @@ class EmailService
         string $newStatus,
         ?string $reason = null
     ): bool {
+        $typeLabel   = $this->formatRequestType($requestType);
         $statusLabel = match ($newStatus) {
             'under_review' => 'Under Review',
             'approved'     => 'Approved',
@@ -89,20 +100,20 @@ class EmailService
             default        => ucfirst($newStatus),
         };
 
-        $subject = 'Request Update: ' . $statusLabel . ' — ' . $this->formatRequestType($requestType);
-        $body    = "<p>Your request for a <strong>{$this->formatRequestType($requestType)}</strong> has been updated.</p>
+        $subject = "Request Update: {$statusLabel} — {$typeLabel}";
+        $body    = "<p>Your request for a <strong>{$typeLabel}</strong> has been updated.</p>
                     <p><strong>New Status:</strong> {$statusLabel}</p>";
 
         if ($reason) {
-            $body .= "<p><strong>Note:</strong> " . htmlspecialchars($reason) . "</p>";
+            $body .= '<p><strong>Note:</strong> ' . htmlspecialchars($reason, ENT_QUOTES, 'UTF-8') . '</p>';
         }
 
         if ($newStatus === 'released') {
-            $body .= "<p>Please visit the barangay hall during office hours to claim your document. Bring a valid ID.</p>";
+            $body .= '<p>Please visit the barangay hall during office hours to claim your document. Bring a valid ID.</p>';
         }
 
         if ($newStatus === 'rejected') {
-            $body .= "<p>If you have questions, please visit the barangay hall or contact us.</p>";
+            $body .= '<p>If you have questions, please visit the barangay hall or contact us.</p>';
         }
 
         $html = $this->template('Request Status Update', $name, $body);
@@ -112,10 +123,16 @@ class EmailService
     public function sendAccountApproved(string $email, string $name): bool
     {
         $subject = 'Account Approved — ' . BARANGAY_NAME;
+        $loginUrl = htmlspecialchars(APP_URL . '/login', ENT_QUOTES, 'UTF-8');
         $html    = $this->template('Account Approved', $name, "
             <p>Your account has been verified and approved by our staff.</p>
             <p>You can now log in and request barangay documents online.</p>
-            <p><a href=\"" . APP_URL . "/login\" style=\"background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;\">Log In Now</a></p>
+            <p>
+              <a href=\"{$loginUrl}\"
+                 style=\"background:#1d4ed8;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;\">
+                Log In Now
+              </a>
+            </p>
         ");
         return $this->send($email, $name, $subject, $html);
     }
@@ -124,9 +141,11 @@ class EmailService
 
     private function template(string $heading, string $recipientName, string $body): string
     {
-        $barangayName = BARANGAY_NAME;
-        $year         = date('Y');
-        $appUrl       = APP_URL;
+        $barangayName  = htmlspecialchars(BARANGAY_NAME, ENT_QUOTES, 'UTF-8');
+        $year          = date('Y');
+        $appUrl        = htmlspecialchars(APP_URL, ENT_QUOTES, 'UTF-8');
+        $safeHeading   = htmlspecialchars($heading,       ENT_QUOTES, 'UTF-8');
+        $safeName      = htmlspecialchars($recipientName, ENT_QUOTES, 'UTF-8');
 
         return <<<HTML
         <!DOCTYPE html>
@@ -134,7 +153,7 @@ class EmailService
         <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{$heading}</title>
+        <title>{$safeHeading}</title>
         </head>
         <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
@@ -148,8 +167,8 @@ class EmailService
                 </tr>
                 <tr>
                   <td style="padding:40px;">
-                    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">{$heading}</h2>
-                    <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hello, {$recipientName}</p>
+                    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">{$safeHeading}</h2>
+                    <p style="margin:0 0 24px;color:#64748b;font-size:14px;">Hello, {$safeName}</p>
                     <div style="color:#334155;font-size:15px;line-height:1.7;">
                       {$body}
                     </div>
@@ -158,7 +177,8 @@ class EmailService
                 <tr>
                   <td style="background:#f8fafc;padding:24px 40px;border-top:1px solid #e2e8f0;text-align:center;">
                     <p style="margin:0;color:#94a3b8;font-size:12px;">
-                      &copy; {$year} {$barangayName} • <a href="{$appUrl}/privacy-policy" style="color:#64748b;">Privacy Policy</a>
+                      &copy; {$year} {$barangayName} &bull;
+                      <a href="{$appUrl}/privacy-policy" style="color:#64748b;">Privacy Policy</a>
                     </p>
                     <p style="margin:4px 0 0;color:#cbd5e1;font-size:11px;">This is an automated message. Please do not reply.</p>
                   </td>

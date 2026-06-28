@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Middleware;
 
 use Core\Auth;
+use Core\Middleware;
 use Core\Request;
 use Core\Response;
 
-class RoleMiddleware
+class RoleMiddleware implements Middleware
 {
     private array $allowedRoles;
 

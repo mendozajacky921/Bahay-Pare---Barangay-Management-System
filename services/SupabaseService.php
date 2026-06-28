@@ -220,6 +220,16 @@ class SupabaseService
 
     /**
      * Count rows matching filters.
+     *
+     * CRITICAL-07 fix: The original code used array destructuring on explode():
+     *   [, $total] = explode('/', $contentRange) + ['', '0'];
+     * This is broken — the `+` operator on arrays uses numeric keys, so the
+     * fallback values at keys 0 and 1 only fill in when those keys are MISSING.
+     * Since explode always returns key 0 (and key 1 when '/' exists), the fallback
+     * '0' at key 1 was never used, meaning a missing '/' in the header produced an
+     * undefined offset notice and silently returned 0 for valid counts too.
+     *
+     * Fixed by: splitting safely, checking parts count, and parsing explicitly.
      */
     public function count(string $table, array $filters = [], bool $useServiceKey = false): int
     {
@@ -237,9 +247,16 @@ class SupabaseService
                 'query' => $query,
             ]);
 
-            $contentRange = $response->getHeader('Content-Range')[0] ?? '0/0';
-            [, $total]    = explode('/', $contentRange) + ['', '0'];
-            return (int)$total;
+            // Content-Range header format from PostgREST: "0-14/47" or "*/47"
+            $contentRange = $response->getHeader('Content-Range')[0] ?? '';
+            if ($contentRange === '' || !str_contains($contentRange, '/')) {
+                return 0;
+            }
+
+            $parts = explode('/', $contentRange, 2);
+            $total = $parts[1] ?? '0';
+
+            return is_numeric($total) ? (int)$total : 0;
         } catch (GuzzleException $e) {
             $this->logError('COUNT', $table, $e);
             return 0;

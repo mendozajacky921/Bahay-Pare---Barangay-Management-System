@@ -25,6 +25,11 @@ class StorageService
     /**
      * Upload a file to a Supabase Storage bucket.
      *
+     * HIGH-07 fix: the original used fopen() directly in the Guzzle 'body' option.
+     * If an exception was thrown, the file handle was never closed, leaking a
+     * file descriptor for the lifetime of the process. Fixed by opening the handle
+     * explicitly, then closing it in a finally block regardless of outcome.
+     *
      * @param string $bucket    Bucket name
      * @param string $path      Path within bucket, e.g. 'residents/uuid/id-photo.jpg'
      * @param string $filePath  Local file path
@@ -42,7 +47,13 @@ class StorageService
             return null;
         }
 
-        $url = SUPABASE_STORAGE_URL . '/object/' . $bucket . '/' . $path;
+        $url    = SUPABASE_STORAGE_URL . '/object/' . $bucket . '/' . $path;
+        $handle = fopen($filePath, 'r');
+
+        if ($handle === false) {
+            $this->logError('upload', new \RuntimeException("Could not open file: {$filePath}"));
+            return null;
+        }
 
         try {
             $response = $this->client->post($url, [
@@ -52,7 +63,7 @@ class StorageService
                     'Content-Type'  => $mimeType,
                     'x-upsert'      => 'true',
                 ],
-                'body' => fopen($filePath, 'r'),
+                'body' => $handle,
             ]);
 
             if ($response->getStatusCode() === 200) {
@@ -65,6 +76,11 @@ class StorageService
         } catch (GuzzleException $e) {
             $this->logError('upload', $e);
             return null;
+        } finally {
+            // Always close the handle — even if an exception was thrown
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
         }
     }
 
@@ -182,7 +198,7 @@ class StorageService
         return $errors;
     }
 
-    private function logError(string $operation, GuzzleException $e): void
+    private function logError(string $operation, \Throwable $e): void
     {
         error_log(
             sprintf("[%s] StorageService::%s error: %s\n", date('Y-m-d H:i:s'), $operation, $e->getMessage()),
