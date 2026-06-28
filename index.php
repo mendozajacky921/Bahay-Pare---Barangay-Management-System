@@ -55,6 +55,7 @@ require_once ROOT_PATH . '/controllers/public/ProjectController.php';
 require_once ROOT_PATH . '/controllers/public/EventController.php';
 require_once ROOT_PATH . '/controllers/public/HotlineController.php';
 require_once ROOT_PATH . '/controllers/public/FormDownloadController.php';
+require_once ROOT_PATH . '/controllers/public/LocaleController.php';
 // Auth
 require_once ROOT_PATH . '/controllers/auth/RegisterController.php';
 require_once ROOT_PATH . '/controllers/auth/LoginController.php';
@@ -94,6 +95,7 @@ $router->get('/hotlines', 'Controllers\Public\HotlineController@index');
 $router->get('/forms', 'Controllers\Public\FormDownloadController@index');
 $router->get('/forms/{id}/download', 'Controllers\Public\FormDownloadController@download');
 $router->get('/privacy-policy', fn() => Core\View::render('public/privacy-policy'));
+$router->post('/set-locale', 'Controllers\Public\LocaleController@store', ['csrf']);
 
 // ── Auth Routes (guest only) ──────────────────────────────
 $router->get('/register', 'Controllers\Auth\RegisterController@show', ['guest']);

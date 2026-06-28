@@ -6,7 +6,11 @@ namespace Core;
 
 abstract class Controller
 {
-    protected Request $request;
+    // HIGH-03 fix: removed `protected Request $request;` — it was declared
+    // but never assigned anywhere. Every controller action already receives
+    // its own Request instance as a method parameter, so this property was
+    // dead weight that could mislead future code into reading an uninitialized
+    // typed property (which throws in PHP 8) if anyone tried to use it.
 
     protected function render(string $view, array $data = [], ?string $layout = null): void
     {

@@ -12,10 +12,18 @@ class Response
         exit;
     }
 
+    /**
+     * CRITICAL-03 fix: HTTP_REFERER is attacker-controllable. Previously this
+     * blindly redirected to whatever Referer header was present, allowing an
+     * open redirect (e.g. a crafted link/form pointing at this site with a
+     * spoofed Referer could bounce an authenticated user to an external
+     * phishing page after login/logout/form submission). Now we only trust
+     * the referer if it points back to our own app — otherwise we fall back
+     * to a safe default.
+     */
     public static function redirectBack(string $fallback = '/'): never
     {
-        $referer = $_SERVER['HTTP_REFERER'] ?? $fallback;
-        self::redirect($referer);
+        self::redirect(self::safeRedirectTarget($fallback));
     }
 
     public static function json(mixed $data, int $code = 200): never
@@ -28,6 +36,13 @@ class Response
 
     public static function abort(int $code, string $message = ''): never
     {
+        // HIGH-06: clear any buffered output before rendering the error view,
+        // otherwise partially-rendered page content can leak before the error
+        // page, producing a garbled response.
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
         http_response_code($code);
         $messages = [
             400 => 'Bad Request',
@@ -48,20 +63,20 @@ class Response
     public static function success(string $message, string $redirect = ''): never
     {
         Session::flash('success', $message);
-        self::redirect($redirect ?: ($_SERVER['HTTP_REFERER'] ?? '/'));
+        self::redirect($redirect ?: self::safeRedirectTarget('/'));
     }
 
     public static function error(string $message, string $redirect = ''): never
     {
         Session::flash('error', $message);
-        self::redirect($redirect ?: ($_SERVER['HTTP_REFERER'] ?? '/'));
+        self::redirect($redirect ?: self::safeRedirectTarget('/'));
     }
 
     public static function withErrors(array $errors, array $old = []): never
     {
         Session::flash('errors', $errors);
         Session::flash('old', $old);
-        self::redirect($_SERVER['HTTP_REFERER'] ?? '/');
+        self::redirect(self::safeRedirectTarget('/'));
     }
 
     public static function download(string $filePath, string $fileName): never
@@ -83,5 +98,28 @@ class Response
         header('Content-Length: ' . strlen($content));
         echo $content;
         exit;
+    }
+
+    /**
+     * Only trust HTTP_REFERER when it points back at our own application.
+     * Anything else (missing, malformed, or pointing off-site) falls back
+     * to the given default. This is what closes the open-redirect hole.
+     */
+    private static function safeRedirectTarget(string $fallback): string
+    {
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+
+        if ($referer === '' || $fallback === '') {
+            return $fallback;
+        }
+
+        $appHost      = parse_url(APP_URL, PHP_URL_HOST);
+        $refererHost  = parse_url($referer, PHP_URL_HOST);
+
+        if ($appHost && $refererHost && strcasecmp($appHost, $refererHost) === 0) {
+            return $referer;
+        }
+
+        return $fallback;
     }
 }

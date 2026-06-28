@@ -1,0 +1,31 @@
+PATCH NOTES — index.php
+========================
+Two small additions needed. Do NOT replace the whole file — just add these
+lines in the indicated spots, since index.php also contains many other
+routes you're actively building on.
+
+--------------------------------------------------------------------------
+1) Add the require, next to the other public controllers:
+--------------------------------------------------------------------------
+
+require_once ROOT_PATH . '/controllers/public/HomeController.php';
+require_once ROOT_PATH . '/controllers/public/AnnouncementController.php';
+require_once ROOT_PATH . '/controllers/public/ProjectController.php';
+require_once ROOT_PATH . '/controllers/public/EventController.php';
+require_once ROOT_PATH . '/controllers/public/HotlineController.php';
+require_once ROOT_PATH . '/controllers/public/FormDownloadController.php';
+require_once ROOT_PATH . '/controllers/public/LocaleController.php';   // <-- ADD THIS LINE
+
+--------------------------------------------------------------------------
+2) Add the route, next to the other public routes (CRITICAL-05 fix):
+--------------------------------------------------------------------------
+
+$router->get('/privacy-policy', fn() => Core\View::render('public/privacy-policy'));
+$router->post('/set-locale', 'Controllers\Public\LocaleController@store', ['csrf']);   // <-- ADD THIS LINE
+
+--------------------------------------------------------------------------
+Why ['csrf'] middleware:
+--------------------------------------------------------------------------
+views/layouts/public.php already sends a _csrf_token hidden field with the
+locale form, so this just makes the route actually validate it (consistent
+with every other POST route in the app).
