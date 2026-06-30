@@ -1,7 +1,8 @@
 # 🏛️ Barangay Management System — Living Memory
 > This document is the single source of truth for all decisions, progress, findings, and context made throughout this project.
-> **Always update this file at the end of every milestone or major decision.**
-> Last Updated: Milestone 1 Complete + QA Review
+> **Always update this file at the end of every milestone or major decision. - ask and wait for my approval**
+
+> Last Updated: Milestone 2 — Public Portal Complete + QA Pass 2 Applied
 
 ---
 
@@ -18,19 +19,33 @@
 
 ---
 
-## 👥 TEAM ROLES (AI-Simulated)
+## 🏢 SOFTWARE COMPANY MODE
+
+Claude operates as a **complete software company** building a production-ready Barangay Management System. Every response draws on all roles simultaneously — the right hat is worn for the right task without being asked.
+
+> **Mode:** Software Company
+> **Client:** Project Owner
+> **Mandate:** Production-ready system, not just working code
+
+### 👥 Team Members & Responsibilities
 
 | Role | Responsibilities |
 |---|---|
-| Product Manager | Requirements, user stories, milestone planning |
-| Business Analyst | Gap analysis, stakeholder mapping, discovery questions |
-| UX/UI Designer | Layout decisions, Tailwind design, accessibility |
-| Software Architect | Folder structure, API design, security layers |
-| Database Engineer | Schema, RLS policies, indexes, migrations |
-| Senior Backend Engineer | PHP controllers, services, routing, middleware |
-| Senior Frontend Engineer | Views, layouts, partials, JS, CSS |
-| QA Engineer | Code review, bug finding, improvement suggestions |
-| DevOps Engineer | Deployment config, .htaccess, environment setup |
+| **Product Manager** | Requirements, user stories, milestone planning, scope decisions |
+| **Business Analyst** | Gap analysis, stakeholder mapping, discovery questions, business rules |
+| **UX/UI Designer** | Layout decisions, Tailwind design, accessibility, mobile responsiveness |
+| **Software Architect** | Folder structure, API design, security layers, technical decisions |
+| **Database Engineer** | Schema, RLS policies, indexes, migrations, query optimization |
+| **Senior Backend Engineer** | PHP controllers, services, routing, middleware, business logic |
+| **Senior Frontend Engineer** | Views, layouts, partials, JS, CSS, bilingual support |
+| **QA Engineer** | Code review, bug finding, improvement suggestions, test planning |
+| **DevOps Engineer** | Deployment config, .htaccess, environment setup, CI/CD |
+
+### Operating Principles
+- Every milestone output is reviewed by all roles before delivery
+- Security, performance, and RA 10173 compliance are non-negotiable on every task
+- No placeholder code in production paths — stubs are clearly marked and tracked
+- MEMORY.md is updated only after explicit owner approval
 
 ---
 
@@ -98,6 +113,14 @@
 - Template method `EmailService::template()` produces consistent HTML wrapper
 - Triggered on: registration, request submitted, status changed, account approved
 
+### Public Content Conventions (established M2)
+- All `show()` endpoints validate `{id}` as a UUID before hitting Supabase — prevents noisy 400 errors from PostgREST on malformed IDs; use the shared `isValidUuid()` private method pattern (already in all 4 public controllers)
+- `public_forms.file_url` stores a **path-only value** within the `public-forms` bucket (e.g. `forms/my-form.pdf`), never a full URL. `StorageService::publicUrl()` builds the full URL at runtime. `FormDownloadController` has a fallback guard for legacy full URLs
+- Download counters use an atomic DB-side RPC (`increment_form_download_count`) — never read-then-write from PHP
+- Event timestamps are compared in UTC using `gmdate('Y-m-d\TH:i:s\Z')` — never `date('c')` which uses server timezone
+- Content fields (`content`, `description`) are **plain text** — rendered with `nl2br(View::e())`. When M7 introduces a rich-text editor, these fields will switch to sanitised HTML. Do not output raw HTML from these fields until that change is made
+- Pagination always: (1) get total count, (2) clamp `$page` to `$totalPages`, (3) derive `$offset` — in that order. Never derive offset before the fallback total is known
+
 ---
 
 ## 👤 USER ROLES & PERMISSIONS
@@ -122,11 +145,11 @@ captain > secretary > clerk > resident
 ## 📋 USER STORIES (All Roles)
 
 ### Public (Unauthenticated)
-- US-001: View news and announcements
-- US-002: View barangay projects
-- US-003: View upcoming events
-- US-004: View emergency hotlines
-- US-005: Download public forms
+- US-001: View news and announcements ✅ M2
+- US-002: View barangay projects ✅ M2
+- US-003: View upcoming events ✅ M2
+- US-004: View emergency hotlines ✅ M2
+- US-005: Download public forms ✅ M2
 - US-006: Register as a resident
 
 ### Resident
@@ -209,7 +232,7 @@ pending → under_review → approved → released
 - `profiles.id` = `auth.users.id` — no separate join needed for auth
 - `profiles.email` duplicated from auth (for easier querying without auth join)
 - Guardian ID fields on `profiles` — for residents without their own valid ID
-- `barangay_settings` is a singleton (one row); enforced by convention (needs constraint — see QA)
+- `barangay_settings` is a singleton (one row); enforced by unique index on `(true)` — migration `003`
 - All content tables support bilingual fields (`title` + `title_fil`, `content` + `content_fil`)
 - Fees stored in `barangay_settings` and configurable by Captain
 
@@ -242,7 +265,7 @@ barangay-ms/
 ├── core/
 │   ├── Auth.php                 # Static auth state (session-backed)
 │   ├── Controller.php           # Abstract base controller + validate()
-│   ├── Middleware.php           # ← DOES NOT EXIST (Critical Bug #1)
+│   ├── Middleware.php           # Interface — implemented by all middleware classes
 │   ├── Request.php              # HTTP request wrapper
 │   ├── Response.php             # Redirect, JSON, abort, flash helpers
 │   ├── Router.php               # URL router with middleware support
@@ -263,21 +286,32 @@ barangay-ms/
 │   └── SupabaseService.php      # Core PostgREST CRUD wrapper
 │
 ├── controllers/
-│   ├── public/                  # HomeController, Announcement, Project, Event, Hotline, FormDownload
+│   ├── public/                  # HomeController, AnnouncementController, ProjectController,
+│   │                            #   EventController, HotlineController, FormDownloadController,
+│   │                            #   LocaleController
 │   ├── auth/                    # LoginController, RegisterController, LogoutController
 │   ├── resident/                # DashboardController, RequestController, ProfileController
-│   └── staff/                   # Dashboard, Request, Resident, Announcement, Project, Event,
-│                                #   Hotline, Form, Staff, Settings, Report, PaymentController
+│   └── staff/                   # DashboardController, RequestController, ResidentController,
+│                                #   AnnouncementController, ProjectController, EventController,
+│                                #   HotlineController, FormController, StaffController,
+│                                #   SettingsController, ReportController, PaymentController
 │
 ├── views/
 │   ├── layouts/                 # public.php, auth.php, resident.php, staff.php
-│   ├── partials/                # alerts.php, csrf-field.php
-│   ├── public/                  # home.php + subdirs for announcements/projects/events/hotlines/forms
-│   ├── auth/                    # login.php, register.php
-│   ├── resident/                # dashboard.php, requests/
-│   ├── staff/                   # dashboard.php + subdirs (stubs — filled per milestone)
-│   ├── pdf/                     # Dompdf templates (clearance, residency, indigency, cedula, barangay-id)
-│   └── errors/                  # 403.php, 404.php, 500.php (401, 405 missing — Critical Bug #6)
+│   ├── partials/                # alerts.php, csrf-field.php, pagination.php
+│   ├── public/
+│   │   ├── home.php             # Landing page with hero, services grid, announcements
+│   │   ├── privacy-policy.php   # Privacy policy stub (M3)
+│   │   ├── announcements/       # index.php, show.php ✅ M2
+│   │   ├── projects/            # index.php, show.php ✅ M2
+│   │   ├── events/              # index.php, show.php ✅ M2
+│   │   ├── hotlines/            # index.php ✅ M2
+│   │   └── forms/               # index.php ✅ M2
+│   ├── auth/                    # login.php, register.php (stubs — M3)
+│   ├── resident/                # dashboard.php, requests/ (stubs — M4)
+│   ├── staff/                   # dashboard.php + subdirs (stubs — M5+)
+│   ├── pdf/                     # Dompdf templates (stubs — M5)
+│   └── errors/                  # 401.php, 403.php, 404.php, 405.php, 500.php
 │
 ├── public/
 │   └── assets/
@@ -286,8 +320,10 @@ barangay-ms/
 │
 ├── supabase/
 │   └── migrations/
-│       ├── 001_initial_schema.sql   # Full schema, RLS, indexes, triggers, seed
-│       └── 002_storage_buckets.sql  # Storage buckets + policies
+│       ├── 001_initial_schema.sql              # Full schema, RLS, indexes, triggers, seed
+│       ├── 002_storage_buckets.sql             # Storage buckets + policies
+│       ├── 003_barangay_settings_singleton.sql # Unique index enforcing singleton settings row
+│       └── 004_form_download_counter_rpc.sql   # Atomic download counter RPC (M2)
 │
 └── storage/
     ├── logs/app.log             # PHP error log destination
@@ -305,8 +341,10 @@ barangay-ms/
 | Database | RLS policies on all tables (second layer beyond PHP) |
 | CSRF | Token per session, validated on every POST, rotated after use |
 | XSS | `View::e()` (htmlspecialchars) must wrap all output |
+| Input Validation | UUID format checked before all Supabase `show()` queries (`isValidUuid()`) |
 | File Uploads | MIME type validated from file content (not extension) via `finfo` |
 | Session Security | ID regenerated every 5 minutes; staff timeout at 30min inactivity |
+| Open Redirect | `Response::safeRedirectTarget()` only trusts referer matching `APP_URL` host |
 | Secrets | All keys in `.env`, never committed; loaded via phpdotenv |
 | Sensitive Files | `.htaccess` blocks access to `/config`, `/views`, `/services`, etc. |
 
@@ -346,6 +384,7 @@ barangay-ms/
 - Toggle stored in `$_SESSION['locale']`
 - Bilingual fields in DB: `title`/`title_fil`, `content`/`content_fil`
 - Default locale: English
+- **Note:** hotlines 911 reminder block is hardcoded EN/FIL — revisit in M12 Bilingual pass
 
 ---
 
@@ -365,82 +404,20 @@ barangay-ms/
 
 | # | Milestone | Status | Notes |
 |---|---|---|---|
-| **M1** | Foundation — project setup, DB, core, layouts | ✅ **COMPLETE** (pending QA fixes) | 84 files, full scaffold |
-| **M2** | Public Portal — announcements, events, projects, hotlines, forms | ⏳ Pending | |
+| **M1** | Foundation — project setup, DB, core, layouts | ✅ **Complete + QA Patched** | 5 fixes applied; CRITICAL-01/02/04/07 verified already fixed in repo |
+| **M2** | Public Portal — announcements, events, projects, hotlines, forms | ✅ **Complete + QA Patched** | 15 files; 2 QA passes; all 8 issues resolved; migration 004 added |
 | **M3** | Resident Auth — register, login, email verify, consent flow | ⏳ Pending | |
 | **M4** | Document Requests — all 5 types + status tracking | ⏳ Pending | |
 | **M5** | Staff Dashboard — request management + PDF generation | ⏳ Pending | |
 | **M6** | Resident Management — staff side | ⏳ Pending | |
-| **M7** | Content Management — announcements, events, projects, hotlines, forms | ⏳ Pending | |
+| **M7** | Content Management — announcements, events, projects, hotlines, forms | ⏳ Pending | Content fields switch to sanitised HTML at this milestone |
 | **M8** | Payments — PayMongo online + walk-in recording | ⏳ Pending | |
 | **M9** | Email Notifications — PHPMailer + SMTP integration | ⏳ Pending | |
 | **M10** | Staff Management — Captain creates/manages staff | ⏳ Pending | |
 | **M11** | Reports — request and resident summaries | ⏳ Pending | |
-| **M12** | Bilingual Support — EN/FIL toggle across all pages | ⏳ Pending | |
+| **M12** | Bilingual Support — EN/FIL toggle across all pages | ⏳ Pending | Fix hardcoded 911 reminder in hotlines view |
 | **M13** | Settings & Branding — barangay config, fees, privacy policy | ⏳ Pending | |
-| **M14** | QA & Hardening — full test pass, security audit, performance | ⏳ Pending | |
-
----
-
-## 🔍 QA REVIEW — MILESTONE 1 FINDINGS
-
-> QA performed after M1 completion. Fixes pending approval before implementation.
-
-### ✅ Critical Issues (7) — Must Fix Before M2
-
-| ID | Issue | File | Risk |
-|---|---|---|---|
-| CRITICAL-01 | `core/Middleware.php` required but doesn't exist | `index.php:34` | App crashes on every request |
-| CRITICAL-02 | Dead `App\` namespace in `composer.json` maps to missing `src/` dir | `composer.json:15` | Autoload confusion |
-| CRITICAL-03 | Open redirect via `HTTP_REFERER` in `Response` | `core/Response.php:17,51,57,64` | Phishing / user hijacking |
-| CRITICAL-04 | Unsafe array key access in `AuthService::login()` | `services/AuthService.php:79–81` | Fatal error on bad Supabase response |
-| CRITICAL-05 | `/set-locale` route missing — language toggle broken | `views/layouts/public.php:91` | 404 on every language toggle click |
-| CRITICAL-06 | `Response::abort()` infinite recursion when error view missing | `core/Response.php:44` | Stack overflow on 401/405 |
-| CRITICAL-07 | Broken array destructuring in `SupabaseService::count()` | `services/SupabaseService.php:241` | Silent wrong counts |
-
-### ⚠️ High Issues (8) — Fix Before Feature Work
-
-| ID | Issue | File |
-|---|---|---|
-| HIGH-01 | Literal `{barangayName}` placeholder in welcome email (not interpolated) | `services/EmailService.php:58` |
-| HIGH-02 | Dead `$db` property in `AuthService` — wastes instantiation on every login | `services/AuthService.php:13,18` |
-| HIGH-03 | `Controller::$request` declared but never assigned | `core/Controller.php:9` |
-| HIGH-04 | Circular namespace stripping in `Router::callHandler()` | `core/Router.php:103–110` |
-| HIGH-05 | `Session::destroy()` called without checking if session is active | `core/Session.php:82` |
-| HIGH-06 | No `ob_end_clean()` before `Response::abort()` — garbled error pages | `core/Response.php:31` |
-| HIGH-07 | File handle leak in `StorageService::upload()` — `fopen` not closed on exception | `services/StorageService.php:55` |
-| HIGH-08 | `APP_URL` not in required env vars — silently empty, breaks all asset URLs | `config/app.php:7` |
-
-### 💡 Medium Issues (10)
-
-| ID | Issue |
-|---|---|
-| MEDIUM-01 | Tailwind config duplicated across all 4 layout files |
-| MEDIUM-02 | Google Fonts loaded redundantly across layouts |
-| MEDIUM-03 | `font-700` is not a valid Tailwind class (should be `font-bold`) |
-| MEDIUM-04 | `START_TIME` constant defined but never used |
-| MEDIUM-05 | `View::$layout` static property declared but never used |
-| MEDIUM-06 | `AuthService::inviteStaff()` creates user with no password — unloggable |
-| MEDIUM-07 | `strlen()` used on binary PDF data — should be `mb_strlen($pdf, '8bit')` |
-| MEDIUM-08 | No `require-dev` / testing framework in `composer.json` |
-| MEDIUM-09 | RLS `FOR ALL` and `FOR UPDATE` policies overlap on `profiles` table |
-| MEDIUM-10 | `barangay_settings` has no singleton constraint — allows multiple rows |
-
-### 🔵 Low Issues (9)
-
-| ID | Issue |
-|---|---|
-| LOW-01 | `.htaccess` does not block `vendor/` directory |
-| LOW-02 | `use PHPMailer\PHPMailer\SMTP` imported but never used |
-| LOW-03 | No `README.md` exists |
-| LOW-04 | `storage/logs/` and `storage/cache/` have no `.gitkeep` files |
-| LOW-05 | `View::partial()` silently fails if partial file is missing |
-| LOW-06 | No security headers (`X-Frame-Options`, `X-Content-Type-Options`, etc.) |
-| LOW-07 | CSRF only guards POST (document assumption for future API work) |
-| LOW-08 | `AuthService::register()` error key access inconsistent with Supabase format |
-| LOW-09 | Error views `401.php` and `405.php` missing |
-
-**QA Status: Awaiting approval to implement fixes.**
+| **M14** | QA & Hardening — full test pass, security audit, performance | ⏳ Pending | Distinguish network errors vs 404 in SupabaseService; review MEDIUM-09 RLS overlap |
 
 ---
 
@@ -477,6 +454,7 @@ GET  /hotlines                 → HotlineController@index
 GET  /forms                    → FormDownloadController@index
 GET  /forms/{id}/download      → FormDownloadController@download
 GET  /privacy-policy           → (inline closure → public/privacy-policy view)
+POST /set-locale               → LocaleController@store [csrf] ✅ Fixed (was CRITICAL-05)
 ```
 
 ### Auth (guest only)
@@ -487,7 +465,6 @@ GET  /login                    → LoginController@show
 POST /login                    → LoginController@store [csrf]
 POST /logout                   → LogoutController@store [auth]
 GET  /verify-email             → RegisterController@verifyEmail
-POST /set-locale               → ⚠️ MISSING ROUTE (Critical Bug #5)
 ```
 
 ### Resident (auth + role:resident)
@@ -543,7 +520,7 @@ SUPABASE_URL=                    # https://xxx.supabase.co
 SUPABASE_ANON_KEY=               # Public anon key
 SUPABASE_SERVICE_ROLE_KEY=       # Service role key (server-side only, never exposed)
 
-# Should be required (currently not — HIGH-08)
+# Should be required (currently not — HIGH-08, carry to M14)
 APP_URL=                         # https://yourdomain.com
 
 # Optional with defaults
@@ -592,7 +569,7 @@ PAYMONGO_WEBHOOK_SECRET=
 | Notifications? | Email only (no SMS) |
 | Languages? | Filipino + English |
 | NPC compliance? | Basic — privacy notice + consent tracking |
-| Hosting? | Hostinger (PHP) + Vercel (not used) + Supabase |
+| Hosting? | Hostinger (PHP) + Supabase |
 | Internet reliability? | Generally available; graceful offline handling desired |
 | Resident devices? | Mobile + desktop (fully responsive) |
 | Staff devices? | Desktop-first at barangay hall |
@@ -606,15 +583,70 @@ Phase 1: Product Planning     ✅ Complete
 Phase 2: System Design        ✅ Complete
 Phase 3: MVP Planning         ✅ Complete
 Phase 4: Implementation       🔄 In Progress
-  └── Milestone 1: Foundation ✅ Built | ⚠️ QA Issues Found — Awaiting Fix Approval
-  └── Milestone 2+            ⏳ Pending
-Phase 5: Quality Assurance    🔄 M1 Review Complete — 7 Critical, 8 High, 10 Medium, 9 Low
+  └── Milestone 1: Foundation ✅ Complete + QA Patched
+  └── Milestone 2: Public Portal ✅ Complete + QA Patched
+  └── Milestone 3+            ⏳ Pending
+Phase 5: Quality Assurance    ✅ M1 pass complete | ✅ M2 pass complete (2 passes)
 Phase 6: Documentation        ⏳ Pending
 ```
 
 ### Next Action
-> **Awaiting approval to implement QA fixes for M1.**
-> Once approved, fixes will be applied in priority order before M2 begins.
+> **Begin Milestone 3 — Resident Auth:** registration form, login form, email verification flow, privacy consent, and the guardian ID fallback UI.
+
+---
+
+## ✅ M1 QA REVIEW — ALL RESOLVED
+
+| ID | Issue | Fix Applied |
+|---|---|---|
+| CRITICAL-01 | `core/Middleware.php` missing | ✅ Exists as interface in repo |
+| CRITICAL-02 | Dead `App\` namespace in composer.json | ✅ Already removed in repo |
+| CRITICAL-03 | Open redirect via `HTTP_REFERER` | ✅ `safeRedirectTarget()` in `Response.php` |
+| CRITICAL-04 | Unsafe array access in `AuthService::login()` | ✅ Null-checked in repo |
+| CRITICAL-05 | `/set-locale` route missing | ✅ `LocaleController` + route added |
+| CRITICAL-06 | `Response::abort()` infinite recursion / garbled pages | ✅ `ob_end_clean()` loop added |
+| CRITICAL-07 | Broken array destructuring in `SupabaseService::count()` | ✅ Fixed in repo |
+| HIGH-01 | `{barangayName}` literal in welcome email | ✅ Fixed — uses `BARANGAY_NAME` constant |
+| HIGH-02 | Dead `$db` in `AuthService` | ✅ Removed |
+| HIGH-03 | Dead `$request` property in `Controller` | ✅ Removed |
+| HIGH-06 | No `ob_end_clean()` before error view | ✅ Fixed |
+| HIGH-07 | File handle leak in `StorageService::upload()` | ✅ `finally` block closes handle |
+| LOW-08 | Wrong error key in `AuthService::register()` | ✅ Fixed |
+| LOW-09 | `401.php` and `405.php` missing | ✅ Both created |
+| MEDIUM-10 | No singleton constraint on `barangay_settings` | ✅ Migration `003` added |
+
+### Still open — carried to M14 backlog
+- HIGH-08: `APP_URL` not validated at boot — silently empty
+- MEDIUM-01/02: Tailwind config + Google Fonts duplicated across 4 layout files
+- MEDIUM-06: `AuthService::inviteStaff()` creates passwordless account
+- MEDIUM-07: `strlen()` on binary PDF data — should be `mb_strlen($pdf, '8bit')`
+- MEDIUM-08: No `require-dev` / testing framework in `composer.json`
+- MEDIUM-09: RLS `FOR ALL` / `FOR UPDATE` overlap on `profiles` table
+- LOW-01 through LOW-07: minor .htaccess, import, header, CSRF scope issues
+
+---
+
+## ✅ M2 QA REVIEW — ALL RESOLVED (2 passes)
+
+### Pass 1 findings → Pass 2 fixes applied
+
+| ID | Issue | Fix Applied |
+|---|---|---|
+| M2-CRITICAL-01 | `file_url` full-URL double-build | ✅ `str_starts_with('http')` guard in `FormDownloadController` |
+| M2-CRITICAL-02 | Pagination broken when falling back to past events | ✅ Fallback runs before offset/totalPages are derived; page clamped |
+| M2-HIGH-01 | Dynamic `bg-<?= $var ?>` Tailwind class in events view | ✅ Replaced with static `if/else` blocks |
+| M2-HIGH-02 | Race condition on download counter (read-then-write) | ✅ Atomic `increment_form_download_count()` RPC + migration `004` |
+| M2-HIGH-03 | No UUID validation before Supabase `show()` queries | ✅ `isValidUuid()` in all 4 public controllers |
+| M2-MEDIUM-01 | `date('c')` uses server timezone for event filter | ✅ Changed to `gmdate('Y-m-d\TH:i:s\Z')` |
+| M2-MEDIUM-04 | `tel:` href dropped leading `0` on PH mobile numbers | ✅ Normalises `09xxxxxxxxx` → `+639xxxxxxxxx` |
+| M2-LOW-02 | File size always shown in KB | ✅ Shows MB when ≥ 1 MB |
+
+### Remaining low-priority — carried to M14 backlog
+- M2-LOW-01: `SupabaseService::selectOne()` null return is ambiguous (network error vs not found) — both correctly 404 for now
+- M2-MEDIUM-02: Content fields plain-text only — document as convention until M7 rich-text editor
+- M2-MEDIUM-03: `pagination.php` `function_exists` guard + comment in place — no action needed
+- M2-LOW-03: MEMORY.md updated (this update)
+- M2-LOW-04: Hotlines 911 reminder hardcoded — flagged for M12 bilingual pass
 
 ---
 
@@ -622,9 +654,11 @@ Phase 6: Documentation        ⏳ Pending
 
 | What you need | Where to find it |
 |---|---|
-| All routes | `index.php` (lines 85–157) |
+| All routes | `index.php` |
 | Database schema | `supabase/migrations/001_initial_schema.sql` |
 | Storage setup | `supabase/migrations/002_storage_buckets.sql` |
+| Settings singleton constraint | `supabase/migrations/003_barangay_settings_singleton.sql` |
+| Atomic download counter RPC | `supabase/migrations/004_form_download_counter_rpc.sql` |
 | App constants | `config/app.php` |
 | Supabase constants | `config/supabase.php` |
 | Base DB operations | `services/SupabaseService.php` |
@@ -635,8 +669,11 @@ Phase 6: Documentation        ⏳ Pending
 | Auth state | `core/Auth.php` |
 | XSS escaping | `Core\View::e($value)` |
 | Flash messages | `Core\Session::flash('success'/'error', $message)` |
+| Pagination partial | `views/partials/pagination.php` |
 | Public layout | `views/layouts/public.php` |
 | Staff layout | `views/layouts/staff.php` |
 | Resident layout | `views/layouts/resident.php` |
 | Custom CSS classes | `public/assets/css/app.css` |
 | Global JS utilities | `public/assets/js/app.js` (`BMS.toast()`, etc.) |
+| UUID validation pattern | `isValidUuid()` — private static method in all public show() controllers |
+| M2 deliverable | `m2_milestone2_patched.tar.gz` |

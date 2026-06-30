@@ -5,6 +5,10 @@
 # Composer
 /vendor/
 
+#windows config
+desktop.ini
+
+
 # Logs
 /storage/logs/*.log
 
@@ -28,3 +32,6 @@ Thumbs.db
 
 # PHP
 *.php~
+
+#Memory
+MEMORY.md

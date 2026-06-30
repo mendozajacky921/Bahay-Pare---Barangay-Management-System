@@ -1,9 +1,36 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Controllers\Public;
-use Core\Controller; use Core\Request;
-class HotlineController extends Controller {
-    public function index(Request $request): void  { $this->render('public/' . strtolower(str_replace('Controller','',str_replace('Download','s',basename(__FILE__,'.php')))), ['pageTitle' => 'Coming Soon']); }
-    public function show(Request $request, array $params): void { $this->render('public/home', ['pageTitle' => 'Item']); }
-    public function download(Request $request, array $params): void { $this->redirect('/forms'); }
+
+use Core\Controller;
+use Core\Request;
+use Services\SupabaseService;
+
+class HotlineController extends Controller
+{
+    public function index(Request $request): void
+    {
+        $db = new SupabaseService();
+
+        $hotlines = $db->select(
+            'hotlines',
+            ['is_active' => 'eq.true'],
+            'id,name,name_fil,category,phone_number,alt_number,sort_order',
+            ['order' => 'category.asc,sort_order.asc']
+        );
+
+        // Group by category for display
+        $grouped = [];
+        foreach ($hotlines as $hotline) {
+            $category = $hotline['category'] ?: 'General';
+            $grouped[$category][] = $hotline;
+        }
+
+        $this->render('public/hotlines/index', [
+            'pageTitle'      => 'Emergency Hotlines',
+            'groupedHotlines' => $grouped,
+        ]);
+    }
 }
